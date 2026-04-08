@@ -1,0 +1,66 @@
+name: devsecops
+version: 0.1.0
+description: "DevSecOps Dependency Resolver — an OpenEnv environment where an AI agent resolves Python package dependency conflicts and patches CVE vulnerabilities using uv as a deterministic offline validation engine."
+author: abishek-priyan-369
+license: apache-2.0
+
+sdk: docker
+app_port: 8000
+base_path: /web
+
+tags:
+  - openenv
+  - devsecops
+  - python
+  - rl-environment
+  - dependency-resolution
+  - security
+  - cve
+
+# Entry points
+server:
+  module: server.app
+  app: app
+client:
+  module: client
+  class: DevSecOpsEnvClient
+
+# Type definitions
+action_model: models.DevSecOpsAction
+observation_model: models.DevSecOpsObservation
+
+# Tasks supported by this environment
+tasks:
+  - id: 1
+    name: "The Dead Link"
+    difficulty: easy
+    description: "Fix a manifest containing a Python package version that does not exist on PyPI. Agent must read the not-found error and update to a real stable version."
+    grader: binary
+    max_score: 1.0
+
+  - id: 2
+    name: "The Version Collision"
+    difficulty: medium
+    description: "Resolve a mathematical version conflict where botocore==1.29.0 requires urllib3<1.27 but urllib3>=2.0 is also pinned. Agent must parse the conflict trace and remove the offending constraint."
+    grader: binary
+    max_score: 1.0
+
+  - id: 3
+    name: "The Deep CVE Patch"
+    difficulty: hard
+    description: "The build succeeds but two packages contain known high-severity CVEs. Agent must trace the CVE report, upgrade vulnerable packages to patched versions, and verify the build still resolves cleanly."
+    grader: compound
+    max_score: 1.0
+
+# Resource limits
+resources:
+  cpu: 2
+  memory: 8GB
+
+# Inference script
+inference:
+  script: inference.py
+  env_vars:
+    - API_BASE_URL
+    - MODEL_NAME
+    - HF_TOKEN

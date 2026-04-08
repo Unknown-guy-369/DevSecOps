@@ -1,0 +1,18 @@
+# Core OpenEnv framework
+openenv-core>=0.1.0
+
+# Pydantic for typed Action / Observation models
+pydantic>=2.0.0
+
+# FastAPI server stack for the OpenEnv HTTP/WebSocket interface
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+
+# uv — Astral's Rust-based Python package manager (used as the offline dependency resolver)
+uv>=0.1.0
+
+# OpenAI client (used by inference.py to call the LLM agent)
+openai>=1.30.0
+
+# python-dotenv — auto-loads .env file for local inference runs
+python-dotenv>=1.0.0
