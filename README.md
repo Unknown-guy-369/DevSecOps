@@ -17,15 +17,29 @@ tags:
 
 ## Overview
 
-Modern software projects are regularly paralyzed by **"dependency hell"** — broken package links, conflicting version requirements between transitive dependencies, and critical CVEs hiding deep in the dependency tree. Human DevOps engineers spend hours manually untangling version matrices and testing patches.
+Software supply-chain incidents have become the dominant attack vector against modern infrastructure. **Log4Shell** (CVE-2021-44228, December 2021) made millions of Java systems remotely exploitable through a transitive logging dependency. The **Equifax breach** (2017) leaked 147 million records because of an unpatched Apache Struts dependency. The **xz-utils backdoor** (CVE-2024-3094, March 2024) showed that even single-maintainer transitive dependencies can be hijacked. Across all three incidents, the failure mode was the same: a vulnerable package buried somewhere in the dependency tree, no human watching closely enough, no fast deterministic way to validate a patch before shipping it.
 
-This OpenEnv environment simulates exactly that challenge. An AI agent manages a Python `requirements.in` manifest and must resolve dependency conflicts and patch security vulnerabilities using a fast, offline, deterministic validation engine powered by **`uv`** (Astral's Rust-based package manager).
+Human DevSecOps engineers spend hours manually untangling version matrices, parsing pip resolver tracebacks, and testing CVE patches. Tools like Dependabot, Renovate, and Snyk can *detect* vulnerabilities but cannot *autonomously reason* about complex version constraint conflicts or trace multi-level transitive dependency chains. There is currently no benchmark in the OpenEnv ecosystem for training agents that close this gap.
 
-The environment is designed to evaluate an agent's ability to:
-- Read and parse structured error output (`uv pip compile` stderr)
-- Reason about version constraint mathematics
-- Trace CVE vulnerability chains through transitive dependencies
-- Make targeted, minimal changes without introducing new regressions
+**This environment is that benchmark.** An AI agent manages a Python `requirements.in` manifest and must resolve real dependency conflicts and patch real CVEs using a fast, offline, deterministic validation engine powered by **`uv`** (Astral's Rust-based package manager). Every step takes under 100 ms, every grade is reproducible, and the entire environment runs offline inside a 2-vCPU / 8 GB container.
+
+### Who would use this environment
+
+- **RL researchers** training agents for code-modifying tool use, where the reward signal needs to be dense, deterministic, and grounded in real subprocess output rather than synthetic metrics
+- **Security tool builders** evaluating LLM agents as a next-generation Dependabot, where the agent must do more than flag vulnerabilities — it must propose and verify patches end-to-end
+- **DevOps platform teams** benchmarking which frontier model is actually capable of autonomous dependency triage on real codebases
+- **Curriculum designers** for agent training, since the easy → medium → hard task progression mirrors the real difficulty curve of supply-chain triage in production
+
+### What the agent must demonstrate
+
+- **Read and parse structured error output** (`uv pip compile` stderr — real, not synthetic)
+- **Reason about version constraint mathematics** (transitive `<` and `>=` bounds intersecting)
+- **Trace CVE vulnerability chains** through resolved dependencies, not just direct ones
+- **Make targeted, minimal changes** without introducing regressions, and resist the temptation to take destructive shortcuts (the grader has anti-cheat that rejects deletion-based "solutions")
+
+### Why this is more than a toy
+
+Unlike most RL benchmarks that wrap a game or a simulated UI, this environment runs the **same `uv` resolver** that production Python projects use today. A patch that works here would work in a real CI pipeline. A model that scores 1.00 here can be put behind a real GitHub webhook tomorrow. There is no abstraction layer between the environment and the actual tool an engineer would invoke.
 
 ---
 
@@ -38,6 +52,12 @@ The environment is designed to evaluate an agent's ability to:
 | Validation speed | < 100ms per `step()` |
 | Network access | Disabled — fully offline and deterministic |
 | Concurrency | Up to 4 simultaneous sessions |
+
+### System Diagram
+
+![System Architecture Diagram](assets/system_diagram.png)
+
+The agent never touches `uv` or the CVE database directly — every interaction goes through the typed `DevSecOpsAction` / `DevSecOpsObservation` contract, and every reward comes from a real subprocess exit code, not a synthetic score.
 
 ---
 
@@ -101,6 +121,8 @@ requests==99.0.0
 
 **Grader:** Binary — `uv pip compile` exit code 0 gives `score = 1.0`, otherwise `0.0`.
 
+**Constraint (anti-cheat):** `requests` must remain in the final manifest. An agent that simply deletes the broken package to make the manifest empty receives `score = 0.0`. The task is "fix the version", not "make the problem go away".
+
 **Expected difficulty:** Easy. A single `update_package` action followed by `run_validation` and `submit_final_manifest` is sufficient.
 
 ---
@@ -113,11 +135,13 @@ botocore==1.29.0
 urllib3>=2.0
 ```
 
-**Objective:** `botocore==1.29.0` has a strict transitive requirement of `urllib3<1.27`, which is mathematically incompatible with `urllib3>=2.0`. The agent must parse the conflict trace in `build_stderr`, identify the removable constraint, and delete it so `botocore` can resolve its own compatible `urllib3` version.
+**Objective:** `botocore==1.29.0` has a strict transitive requirement of `urllib3<1.27`, which is mathematically incompatible with the directly-pinned `urllib3>=2.0`. The agent must parse the conflict trace in `build_stderr`, identify the removable *outer* constraint (`urllib3>=2.0`), and delete it so `botocore` can resolve its own compatible `urllib3` version.
 
 **Grader:** Binary — clean build gives `score = 1.0`, otherwise `0.0`.
 
-**Expected difficulty:** Medium. Requires reading and reasoning about the conflict trace.
+**Constraint (anti-cheat):** `botocore` must remain in the final manifest. The "shortcut" of deleting `botocore` (the package the task is about) instead of resolving the conflict around it is rejected with `score = 0.0`. The task is "make `botocore` work", not "remove `botocore`".
+
+**Expected difficulty:** Medium. Requires reading and reasoning about a transitive conflict trace and choosing the correct constraint to remove.
 
 ---
 
@@ -140,23 +164,27 @@ The agent must identify both vulnerable packages from `cve_report`, upgrade them
 - Build succeeds but CVEs remain → `score = 0.5`
 - Build succeeds and `cve_report` is empty → `score = 1.0`
 
-**Expected difficulty:** Hard. Requires reading CVE metadata and upgrading multiple packages without breaking the build.
+**Constraint (anti-cheat):** Both `requests` and `certifi` must remain in the final manifest. A naive "delete the vulnerable packages" strategy would technically result in an empty manifest that builds with no CVEs (because there are no packages to be vulnerable) — this is rejected with `score = 0.0`. The task is "patch the CVEs", not "make the application stop using those libraries".
+
+**Expected difficulty:** Hard. Requires reading CVE metadata, upgrading multiple packages without breaking the build, AND resisting the destructive shortcut.
 
 ---
 
 ## Reward Function
 
-The environment provides dense, shaped rewards throughout the episode:
+The environment provides dense, shaped rewards over the full trajectory — not just a binary end-of-episode signal. Partial progress is rewarded; clearly undesirable behavior such as infinite loops and wasted actions is penalized.
 
 | Event | Reward |
 |-------|--------|
 | `run_validation` reduces error line count vs. previous step | `+0.2` |
-| `run_validation` increases error line count (regression) | `−0.1` |
 | CVE removed from `cve_report` without breaking the build | `+0.2` per CVE |
 | `submit_final_manifest` on a perfect state (build OK + no CVEs) | `+0.5` bonus |
-| Invalid `update_package` call (missing name or specifier) | `−0.05` |
+| `run_validation` increases error line count (regression) | `−0.1` |
+| Repeated identical action (loop penalty) | `−0.05` |
+| `remove_package` on a package not in the manifest (wasted action) | `−0.05` |
+| Invalid `update_package` or `remove_package` call (missing name or specifier) | `−0.05` |
 
-All rewards are capped at `1.0` per episode.
+Per-step rewards are clamped to `[−1.0, +1.0]` and capped at `1.0` cumulative per episode.
 
 ---
 
@@ -208,19 +236,28 @@ docker run -p 8000:8000 -e ENABLE_WEB_INTERFACE=true devsecops-env
 
 ### Run Baseline Inference
 
+The script defaults to OpenRouter (an OpenAI-compatible gateway) but works with any OpenAI-compatible endpoint. Judges may override `API_BASE_URL`, `MODEL_NAME`, and the API key via environment variables.
+
 ```bash
-export API_BASE_URL="https://api.openai.com/v1"
-export MODEL_NAME="gpt-4o-mini"
-export HF_TOKEN="your-openai-api-key"
+# Default (OpenRouter):
+export API_BASE_URL="https://openrouter.ai/api/v1"
+export MODEL_NAME="openai/gpt-4o-mini"
+export HF_TOKEN="sk-or-v1-your-key"   # also accepts OPENAI_API_KEY or API_KEY
 
 python inference.py
 ```
+
+The inference script reads credentials from any of: `HF_TOKEN`, `OPENAI_API_KEY`, or `API_KEY` (in that order). Logs are emitted in spec-compliant `[START]` / `[STEP]` / `[END]` format on stdout.
 
 ### Run Tests
 
 ```bash
 python test_env.py
 ```
+
+The test suite includes:
+- **Functional tests** for all 3 tasks — verifies the legitimate solution path scores 1.00
+- **Anti-cheat tests** for all 3 tasks — verifies that destructive deletion exploits are rejected with 0.0, proving the env is exploit-resistant against trivial shortcut strategies
 
 ### Connect via Python Client
 

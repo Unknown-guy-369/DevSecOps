@@ -91,10 +91,74 @@ def test_task3():
     assert score_after == 1.0, f"Expected score 1.0, got {score_after}"
     print("Task 3 PASSED")
 
+def test_anti_cheat_task1_destructive_deletion():
+    """An agent that removes 'requests' instead of fixing it should score 0.0,
+    not 1.0. This proves the env is exploit-resistant against trivial
+    destructive solutions."""
+    env = DevSecOpsEnvironment()
+    env.reset(task_id=1)
+
+    # Cheat attempt: delete the broken package instead of fixing it
+    env.step(DevSecOpsAction(action_type="remove_package", package_name="requests"))
+    obs = env.step(DevSecOpsAction(action_type="run_validation"))
+    # Empty manifest builds cleanly...
+    assert obs.build_status == "SUCCESS", f"Expected empty manifest to build, got {obs.build_status}"
+    # ...but the grader must reject the destructive solution
+    score = env.grade()
+    print(f"Task 1 Anti-Cheat: removed 'requests' -> grade={score} (must be 0.0)")
+    assert score == 0.0, f"Anti-cheat FAILED: deletion exploit returned {score}, expected 0.0"
+    print("Task 1 Anti-Cheat PASSED")
+
+
+def test_anti_cheat_task2_destructive_deletion():
+    """An agent that removes 'botocore' instead of resolving the urllib3
+    conflict should score 0.0."""
+    env = DevSecOpsEnvironment()
+    env.reset(task_id=2)
+
+    # Cheat attempt: delete botocore (the real subject of the task) instead of
+    # resolving the urllib3 conflict around it
+    env.step(DevSecOpsAction(action_type="remove_package", package_name="botocore"))
+    obs = env.step(DevSecOpsAction(action_type="run_validation"))
+    assert obs.build_status == "SUCCESS", f"Expected urllib3-only manifest to build, got {obs.build_status}"
+    score = env.grade()
+    print(f"Task 2 Anti-Cheat: removed 'botocore' -> grade={score} (must be 0.0)")
+    assert score == 0.0, f"Anti-cheat FAILED: deletion exploit returned {score}, expected 0.0"
+    print("Task 2 Anti-Cheat PASSED")
+
+
+def test_anti_cheat_task3_destructive_deletion():
+    """An agent that removes the vulnerable packages instead of upgrading them
+    should score 0.0 — even though an empty manifest 'builds' and has 'no CVEs'."""
+    env = DevSecOpsEnvironment()
+    env.reset(task_id=3)
+
+    # Cheat attempt: delete both vulnerable packages so cve_report is empty
+    env.step(DevSecOpsAction(action_type="remove_package", package_name="requests"))
+    env.step(DevSecOpsAction(action_type="remove_package", package_name="certifi"))
+    obs = env.step(DevSecOpsAction(action_type="run_validation"))
+    assert obs.build_status == "SUCCESS", f"Expected empty manifest to build, got {obs.build_status}"
+    assert len(obs.cve_report) == 0, "Expected no CVEs in empty manifest"
+    # Naive grader would return 1.0 here. Anti-cheat should reject.
+    score = env.grade()
+    print(f"Task 3 Anti-Cheat: removed both vulnerable pkgs -> grade={score} (must be 0.0)")
+    assert score == 0.0, f"Anti-cheat FAILED: deletion exploit returned {score}, expected 0.0"
+    print("Task 3 Anti-Cheat PASSED")
+
+
 if __name__ == "__main__":
     test_task1()
     print("----")
     test_task2()
     print("----")
     test_task3()
+    print("----")
+    print("ANTI-CHEAT TESTS (proving env is exploit-resistant):")
+    print("----")
+    test_anti_cheat_task1_destructive_deletion()
+    print("----")
+    test_anti_cheat_task2_destructive_deletion()
+    print("----")
+    test_anti_cheat_task3_destructive_deletion()
+    print("----")
     print("ALL TESTS COMPLETE")

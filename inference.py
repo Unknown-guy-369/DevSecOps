@@ -17,7 +17,7 @@ Environment Variables:
                     Default: https://openrouter.ai/api/v1
     MODEL_NAME    - Model identifier
                     Default: openai/gpt-4o-mini
-    HF_TOKEN      - API key (also accepts API_KEY as fallback)
+    HF_TOKEN      - API key (also accepts OPENAI_API_KEY or API_KEY as fallback)
 
 STDOUT FORMAT (mandatory, single-line per record):
     [START] task=<name> env=<benchmark> model=<model_name>
@@ -41,7 +41,7 @@ except ImportError:
 # ── Environment Variables ────────────────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL") or "https://openrouter.ai/api/v1"
 MODEL_NAME   = os.getenv("MODEL_NAME")   or "openai/gpt-4o-mini"
-API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or ""
+API_KEY      = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY") or ""
 BENCHMARK    = "devsecops"
 
 # ── Path Setup ───────────────────────────────────────────────────────────────

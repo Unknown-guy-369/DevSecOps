@@ -12,6 +12,17 @@ try:
 except (ImportError, ModuleNotFoundError):
     from models import DevSecOpsAction, DevSecOpsObservation
 
+# ── Anti-cheat: required packages per task ──────────────────────────────────
+# Each task defines packages that MUST remain in the final manifest. This
+# prevents the destructive-deletion exploit (e.g. an agent calling
+# remove_package(requests) on Task 1 to make the manifest empty so it builds
+# trivially). The grader returns 0.0 if any required package is missing.
+TASK_REQUIRED_PACKAGES = {
+    1: ["requests"],            # must keep requests, just fix the broken version
+    2: ["botocore"],            # must keep botocore, just resolve the urllib3 conflict
+    3: ["requests", "certifi"], # must keep both, just upgrade them past the CVEs
+}
+
 # Mock Vulnerability Database
 MOCK_CVE_DB = {
     "certifi": {
@@ -33,6 +44,7 @@ class DevSecOpsState(State):
     manifest_lines: List[str] = []
     error_lines_count: int = 0
     cves: List[Dict[str, Any]] = []
+    last_action_sig: str = ""
 
 class DevSecOpsEnvironment(Environment):
     """
@@ -75,10 +87,19 @@ class DevSecOpsEnvironment(Environment):
 
     def step(self, action: DevSecOpsAction) -> DevSecOpsObservation: # type: ignore[override]
         self._state.step_count += 1
-        
+
         reward = 0.0
         done = False
-        
+
+        # ── Anti-loop penalty ────────────────────────────────────────────────
+        # Penalize repeated identical actions (e.g. agent stuck in a loop calling
+        # remove_package(urllib3) over and over). Also penalizes destructive /
+        # wasted actions like removing a package that isn't in the manifest.
+        current_sig = self._action_signature(action)
+        if current_sig and current_sig == self._state.last_action_sig:
+            reward -= 0.05  # loop penalty
+        self._state.last_action_sig = current_sig
+
         # Action handling
         if action.action_type == "update_package":
             if not action.package_name or not action.new_version_specifier:
@@ -92,16 +113,26 @@ class DevSecOpsEnvironment(Environment):
                         break
                 if not found:
                     self._state.manifest_lines.append(f"{action.package_name}{action.new_version_specifier}")
-                    
+
         elif action.action_type == "remove_package":
-            if action.package_name:
+            if not action.package_name:
+                reward -= 0.05  # missing parameter
+            else:
+                # Wasted-action penalty: removing a package that isn't in the manifest
+                already_absent = not any(
+                    line.startswith(action.package_name)
+                    for line in self._state.manifest_lines
+                )
+                if already_absent:
+                    reward -= 0.05
                 self._state.manifest_lines = [
-                    line for line in self._state.manifest_lines 
+                    line for line in self._state.manifest_lines
                     if not line.startswith(action.package_name)
                 ]
-                
+
         elif action.action_type == "run_validation":
             obs = self._run_validation_internal()
+            obs.reward = max(min(obs.reward + reward, 1.0), -1.0)
             return obs
 
         elif action.action_type == "submit_final_manifest":
@@ -110,11 +141,11 @@ class DevSecOpsEnvironment(Environment):
             if grade_score == 1.0:
                 reward += 0.5
             done = True
-            obs.reward =min(obs.reward+reward,1.0)
+            obs.reward = max(min(obs.reward + reward, 1.0), -1.0)
             obs.done = done
             return obs
-            
-        # For non-validation actions, we return the current unvalidated state
+
+        # For non-validation actions, return the current unvalidated state
         return DevSecOpsObservation(
             manifest_content="\n".join(self._state.manifest_lines),
             build_status="UNKNOWN",
@@ -123,6 +154,19 @@ class DevSecOpsEnvironment(Environment):
             reward=reward,
             done=done
         )
+
+    def _action_signature(self, action: DevSecOpsAction) -> str:
+        """Compact string identity for an action — used for loop detection."""
+        t = action.action_type
+        if t == "update_package":
+            return f"update:{action.package_name}:{action.new_version_specifier}"
+        if t == "remove_package":
+            return f"remove:{action.package_name}"
+        if t == "run_validation":
+            return "validate"
+        if t == "submit_final_manifest":
+            return "submit"
+        return t or ""
         
     def _run_validation_internal(self) -> DevSecOpsObservation:
         req_in_path = os.path.join(self._temp_dir.name, "requirements.in")
@@ -206,18 +250,35 @@ class DevSecOpsEnvironment(Environment):
                 done=False
             )
     def grade(self) -> float:
-        """Grade the current state of the environment. Returns 0.0 to 1.0."""
+        """Grade the current state of the environment. Returns 0.0 to 1.0.
+
+        Anti-cheat: each task has a required-package list. If the agent has
+        deleted any of those packages from the manifest, the grader returns 0.0
+        regardless of build status. This prevents trivial destructive solutions
+        (e.g. removing the broken package instead of fixing it).
+        """
         obs = self._run_validation_internal()
         task_id = self._state.task_id
-    
+
+        # ── Anti-cheat: required packages must remain in the manifest ────────
+        required = TASK_REQUIRED_PACKAGES.get(task_id, [])
+        for required_pkg in required:
+            still_present = any(
+                line.strip().lower().startswith(required_pkg.lower())
+                for line in self._state.manifest_lines
+            )
+            if not still_present:
+                # Destructive deletion of a required package — not a valid solution
+                return 0.0
+
         if task_id == 1:
             # Binary: does it build?
             return 1.0 if obs.build_status == "SUCCESS" else 0.0
-    
+
         elif task_id == 2:
             # Binary: does it build without conflicts?
             return 1.0 if obs.build_status == "SUCCESS" else 0.0
-    
+
         elif task_id == 3:
             # Compound: must build AND have no CVEs
             if obs.build_status != "SUCCESS":
@@ -226,7 +287,7 @@ class DevSecOpsEnvironment(Environment):
                 return 0.5  # Builds but still vulnerable
             else:
                 return 1.0  # Perfect: builds and no CVEs
-    
+
         return 0.0
 
     @property
