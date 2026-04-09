@@ -1,4 +1,4 @@
-"""
+﻿"""
 Baseline inference script for the DevSecOps Dependency Resolver OpenEnv.
 
 This script runs a language model agent (via an OpenAI-compatible API) against
@@ -30,7 +30,7 @@ import sys
 import json
 import re
 
-# ── Optional .env loader (no-op if python-dotenv isn't installed) ────────────
+# ÔöÇÔöÇ Optional .env loader (no-op if python-dotenv isn't installed) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 # Judges set env vars directly; this is purely for local development convenience.
 try:
     from dotenv import load_dotenv
@@ -38,20 +38,20 @@ try:
 except ImportError:
     pass
 
-# ── Environment Variables ────────────────────────────────────────────────────
+# ÔöÇÔöÇ Environment Variables ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 API_BASE_URL = os.getenv("API_BASE_URL") or "https://openrouter.ai/api/v1"
 MODEL_NAME   = os.getenv("MODEL_NAME")   or "openai/gpt-4o-mini"
 API_KEY      = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY") or ""
 BENCHMARK    = "devsecops"
 
-# ── Path Setup ───────────────────────────────────────────────────────────────
+# ÔöÇÔöÇ Path Setup ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from openai import OpenAI
 from models import DevSecOpsAction, DevSecOpsObservation
 from server.devsecops_environment import DevSecOpsEnvironment
 
-# ── OpenAI-compatible Client ─────────────────────────────────────────────────
+# ÔöÇÔöÇ OpenAI-compatible Client ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 client = OpenAI(
     base_url=API_BASE_URL,
     api_key=API_KEY if API_KEY else "placeholder",
@@ -61,7 +61,7 @@ client = OpenAI(
     },
 )
 
-# ── Constants ────────────────────────────────────────────────────────────────
+# ÔöÇÔöÇ Constants ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 MAX_STEPS = 15
 TEMPERATURE = 0.0
 
@@ -69,7 +69,7 @@ SYSTEM_PROMPT = """You are an expert DevSecOps engineer operating a Python depen
 
 Your job is to fix dependency issues in a requirements.in file by taking one action at a time.
 
-Available actions — respond with ONLY valid JSON, no other text:
+Available actions ÔÇö respond with ONLY valid JSON, no other text:
 
 1. Update a package to a specific version:
    {"action_type": "update_package", "package_name": "requests", "new_version_specifier": "==2.31.0"}
@@ -114,7 +114,7 @@ TASK_DESCRIPTIONS = {
 }
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# ÔöÇÔöÇ Helpers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 def action_to_str(a: dict) -> str:
     """Render an action dict as a compact one-line string for the [STEP] log."""
     t = a.get("action_type", "unknown")
@@ -167,7 +167,7 @@ def run_task(task_id: int) -> dict:
     """Run a single task episode and emit spec-compliant [START]/[STEP]/[END] logs."""
     task_name, task_desc = TASK_DESCRIPTIONS[task_id]
 
-    # ── [START] ──────────────────────────────────────────────────────────────
+    # ÔöÇÔöÇ [START] ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     print(f"[START] task={task_name} env={BENCHMARK} model={MODEL_NAME}", flush=True)
 
     rewards: list = []
@@ -249,7 +249,7 @@ def run_task(task_id: int) -> dict:
         print(f"[WARN] task {task_id} fatal: {e}", file=sys.stderr, flush=True)
 
     finally:
-        # ── [END] (always emitted) ───────────────────────────────────────────
+        # ÔöÇÔöÇ [END] (always emitted) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
         rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else ""
         print(
             f"[END] success={'true' if success else 'false'} "
@@ -269,7 +269,7 @@ def run_task(task_id: int) -> dict:
 
 def main():
     print("=" * 60, flush=True)
-    print("DevSecOps Dependency Resolver — Baseline Inference", flush=True)
+    print("DevSecOps Dependency Resolver ÔÇö Baseline Inference", flush=True)
     print(f"Model : {MODEL_NAME}", flush=True)
     print(f"API   : {API_BASE_URL}", flush=True)
     print("=" * 60, flush=True)

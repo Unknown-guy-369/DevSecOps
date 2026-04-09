@@ -1,4 +1,4 @@
-import os
+﻿import os
 import subprocess
 import tempfile
 from uuid import uuid4
@@ -12,7 +12,7 @@ try:
 except (ImportError, ModuleNotFoundError):
     from models import DevSecOpsAction, DevSecOpsObservation
 
-# ── Anti-cheat: required packages per task ──────────────────────────────────
+# ÔöÇÔöÇ Anti-cheat: required packages per task ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 # Each task defines packages that MUST remain in the final manifest. This
 # prevents the destructive-deletion exploit (e.g. an agent calling
 # remove_package(requests) on Task 1 to make the manifest empty so it builds
@@ -91,7 +91,7 @@ class DevSecOpsEnvironment(Environment):
         reward = 0.0
         done = False
 
-        # ── Anti-loop penalty ────────────────────────────────────────────────
+        # ÔöÇÔöÇ Anti-loop penalty ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
         # Penalize repeated identical actions (e.g. agent stuck in a loop calling
         # remove_package(urllib3) over and over). Also penalizes destructive /
         # wasted actions like removing a package that isn't in the manifest.
@@ -157,7 +157,7 @@ class DevSecOpsEnvironment(Environment):
         )
 
     def _action_signature(self, action: DevSecOpsAction) -> str:
-        """Compact string identity for an action — used for loop detection."""
+        """Compact string identity for an action ÔÇö used for loop detection."""
         t = action.action_type
         if t == "update_package":
             return f"update:{action.package_name}:{action.new_version_specifier}"
@@ -253,8 +253,8 @@ class DevSecOpsEnvironment(Environment):
     def grade(self) -> float:
         """Grade the current state of the environment.
 
-        All returned scores are strictly inside the open interval (0, 1) —
-        never exactly 0.0 and never exactly 1.0 — as required by the
+        All returned scores are strictly inside the open interval (0, 1) ÔÇö
+        never exactly 0.0 and never exactly 1.0 ÔÇö as required by the
         submission validator.
 
         Score bands:
@@ -272,7 +272,7 @@ class DevSecOpsEnvironment(Environment):
         obs = self._run_validation_internal()
         task_id = self._state.task_id
 
-        # ── Anti-cheat: required packages must remain in the manifest ────────
+        # ÔöÇÔöÇ Anti-cheat: required packages must remain in the manifest ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
         required = TASK_REQUIRED_PACKAGES.get(task_id, [])
         for required_pkg in required:
             still_present = any(
@@ -280,7 +280,7 @@ class DevSecOpsEnvironment(Environment):
                 for line in self._state.manifest_lines
             )
             if not still_present:
-                # Destructive deletion of a required package — not a valid solution
+                # Destructive deletion of a required package ÔÇö not a valid solution
                 return 0.01
 
         if task_id == 1:

@@ -48,7 +48,7 @@ def test_task2():
     # Grade the task
     score = env.grade()
     print(f"Task 2 Grade: {score}")
-    assert score == 1.0, f"Expected score 1.0, got {score}"
+    assert score == 0.99, f"Expected score 0.99, got {score}"
     print("Task 2 PASSED")
 
 def test_task3():
@@ -85,10 +85,10 @@ def test_task3():
     obs = env.step(DevSecOpsAction(action_type="run_validation"))
     print(f"Task 3 After fix: Build={obs.build_status}, CVEs={len(obs.cve_report)}, Reward={obs.reward}")
 
-    # Grade after fix - should be 1.0
+    # Grade after fix - should be 0.99 (strictly < 1.0 per validator spec)
     score_after = env.grade()
     print(f"Task 3 Grade after fix: {score_after}")
-    assert score_after == 1.0, f"Expected score 1.0, got {score_after}"
+    assert score_after == 0.99, f"Expected score 0.99, got {score_after}"
     print("Task 3 PASSED")
 
 def test_anti_cheat_task1_destructive_deletion():
@@ -105,8 +105,8 @@ def test_anti_cheat_task1_destructive_deletion():
     assert obs.build_status == "SUCCESS", f"Expected empty manifest to build, got {obs.build_status}"
     # ...but the grader must reject the destructive solution
     score = env.grade()
-    print(f"Task 1 Anti-Cheat: removed 'requests' -> grade={score} (must be 0.0)")
-    assert score == 0.0, f"Anti-cheat FAILED: deletion exploit returned {score}, expected 0.0"
+    print(f"Task 1 Anti-Cheat: removed 'requests' -> grade={score} (must be 0.01)")
+    assert score == 0.01, f"Anti-cheat FAILED: deletion exploit returned {score}, expected 0.01"
     print("Task 1 Anti-Cheat PASSED")
 
 
@@ -122,8 +122,8 @@ def test_anti_cheat_task2_destructive_deletion():
     obs = env.step(DevSecOpsAction(action_type="run_validation"))
     assert obs.build_status == "SUCCESS", f"Expected urllib3-only manifest to build, got {obs.build_status}"
     score = env.grade()
-    print(f"Task 2 Anti-Cheat: removed 'botocore' -> grade={score} (must be 0.0)")
-    assert score == 0.0, f"Anti-cheat FAILED: deletion exploit returned {score}, expected 0.0"
+    print(f"Task 2 Anti-Cheat: removed 'botocore' -> grade={score} (must be 0.01)")
+    assert score == 0.01, f"Anti-cheat FAILED: deletion exploit returned {score}, expected 0.01"
     print("Task 2 Anti-Cheat PASSED")
 
 
@@ -141,8 +141,8 @@ def test_anti_cheat_task3_destructive_deletion():
     assert len(obs.cve_report) == 0, "Expected no CVEs in empty manifest"
     # Naive grader would return 1.0 here. Anti-cheat should reject.
     score = env.grade()
-    print(f"Task 3 Anti-Cheat: removed both vulnerable pkgs -> grade={score} (must be 0.0)")
-    assert score == 0.0, f"Anti-cheat FAILED: deletion exploit returned {score}, expected 0.0"
+    print(f"Task 3 Anti-Cheat: removed both vulnerable pkgs -> grade={score} (must be 0.01)")
+    assert score == 0.01, f"Anti-cheat FAILED: deletion exploit returned {score}, expected 0.01"
     print("Task 3 Anti-Cheat PASSED")
 
 
